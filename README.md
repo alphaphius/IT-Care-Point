@@ -40,7 +40,7 @@ SPA deep-link รองรับแล้ว (มี `dist/404.html` ให้ G
 1. เปิด https://script.google.com → New Project → วางโค้ดจาก `gas/Code.gs` ทั้งหมด (ลบโค้ดเริ่มต้นทิ้ง)
 2. ใน Apps Script editor เปิด Console (เพื่อตรวจ syntax ผ่าน)
 3. Deploy → New deployment → Web app
-   - Execute as: **Me**
+   - Execute as: **User accessing the web app** (สำคัญมาก — ต้องเป็นแบบนี้ทุกครั้ง เพื่อให้ระบุตัวผู้ใช้แต่ละคนได้)
    - Who has access: **Anyone with Google account**
 4. เปิด console ของ backend รัน `setupTriggers()` หนึ่งครั้ง เพื่อตั้ง SLA trigger รายชั่วโมง
 5. copy URL ที่ลงท้าย `/exec` ไปใส่ในหน้าตั้งค่าแอป (หน้าแรกของเว็บ)

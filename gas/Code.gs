@@ -402,6 +402,7 @@ function getAttachFolder() {
     if (id) return DriveApp.getFolderById(id);
   } catch (e) { /* recreate */ }
   var folder = DriveApp.createFolder("IT Care Point Attachments");
+  folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.EDIT);
   props.setProperty(FOLDER_ID_KEY, folder.getId());
   return folder;
 }
@@ -525,7 +526,7 @@ function mailToStaff(subject, body) {
 /* ============ Dashboard ============ */
 
 function dashboard() {
-  var rows = getRows("Tickets").map(rowToTicket);
+  var rows = getRows("Tickets").map(rowToTicket).sort(function (a, b) { return b.opened_at.localeCompare(a.opened_at); });
   var now = Date.now();
   var open = rows.filter(function (t) { return !isClosed(t.status); });
   var overdue = open.filter(function (t) { return t.sla_deadline && new Date(t.sla_deadline) < new Date(); }).length;
@@ -602,6 +603,7 @@ function getSpreadsheet() {
   }
   var ss = SpreadsheetApp.create("IT Care Point Database");
   props.setProperty(SPREADSHEET_ID_KEY, ss.getId());
+  DriveApp.getFileById(ss.getId()).setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.EDIT);
   initSheets(ss);
   return ss;
 }
