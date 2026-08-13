@@ -63,7 +63,7 @@ function route(action, body, user) {
     case "notifications.read": markNotificationsRead(body.ids || []); return { ok: true };
     case "assets.list": return { assets: listAssets() };
     case "assets.create": requireAdmin(user); return { asset: createAsset(body, user) };
-    case "assets.get": return { asset: getAsset(body.tag) };
+    case "assets.get": return getAsset(body.tag);
     case "dashboard": requireAdmin(user); return dashboard();
     case "pm.list": requireAdmin(user); return { items: listPM() };
     case "pm.create": requireAdmin(user); return { item: createPM(body, user) };
@@ -288,11 +288,8 @@ function updateTicket(id, patch, user) {
       if (patch.status !== "Canceled") throw new Error("ผู้แจ้งสามารถยกเลิกงานได้เท่านั้น");
     }
     var from = rec.status;
-    if (!isClosed(from) && !isClosed(patch.status)) {
+    if (!isClosed(from)) {
       if (patch.status === "Resolved") {
-        if (from !== "In Progress" && from !== "Pending Parts" && from !== "Received") {
-          // allow resolve from Received too for simple cases
-        }
         changes.status = "Resolved";
         changes.resolved_at = now.toISOString();
         changes.closed_at = now.toISOString();
@@ -479,7 +476,7 @@ function completePM(id) {
 function listNotifications(email) {
   var rows = getRows("Notifications").filter(function (n) { return n.email === email; });
   var items = rows.map(rowToNotif).sort(function (a, b) { return b.ts.localeCompare(a.ts); }).slice(0, 30);
-  var unread = items.filter(function (n) { return n.read !== "true"; }).length;
+  var unread = items.filter(function (n) { return !n.read; }).length;
   return { items: items, unread: unread };
 }
 
