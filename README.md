@@ -41,7 +41,7 @@ SPA deep-link รองรับแล้ว (มี `dist/404.html` ให้ G
 **สถานะ: deploy แล้ว** ที่ Script ID `1VVuO53LPkJZoVH0vwieVYujnIWDv9Usj2GsVNp2wgT1FwDDNv3vUqJx4`
 
 ใช้ **1 deployment** เท่านั้น (anonymous + user-deploying):
-- **URL API** (Execute as: Me / Access: Anyone, even anonymous): `https://script.google.com/macros/s/AKfycbysjvfKAZ_y2wTzzZvAruN_4YMp95KIIF23KB9ESGKFRezug5mV5p-UAxm9IWza6UNJKw/exec`
+- **URL API** (Execute as: Me / Access: Anyone): `https://script.google.com/macros/s/AKfycbyJIljEShjvEbXc838CSEjA1JRT7C3WTuphp1fCJ-qrMlsKUfMgYFPY3BEE0HUAupUMbQ/exec`
 
 ถ้าจะ deploy ใหม่ด้วยตัวเอง:
 1. ติดตั้ง clasp: `npm i -g @google/clasp` แล้ว `clasp login`
@@ -50,7 +50,7 @@ SPA deep-link รองรับแล้ว (มี `dist/404.html` ให้ G
 4. เปิด console ของ backend รัน `setupTriggers()` หนึ่งครั้ง เพื่อตั้ง SLA trigger รายชั่วโมง
 5. แก้ URL ได้ที่หน้า Admin → ตั้งค่า → ข้อมูลแอป
 
-> ครั้งแรกที่เข้าใช้งาน จะสร้าง sheet: Tickets, Messages, Assets, PM, Settings, Sessions, Users, Notifications ให้อัตโนมัติ
+> รัน `setupSystem()` หนึ่งครั้งหลัง deploy เพื่อสร้าง/ตรวจ sheet และปรับสิทธิ์ฐานข้อมูลเป็น Private: Tickets, Messages, Assets, PM, Settings, Sessions, Users, Notifications
 > ผู้ใช้คนแรกเมื่อยังไม่มี admin จะกลายเป็น admin คนแรก
 > สมัครสมาชิก: email + รหัสผ่าน (hash ด้วย PBKDF2-SHA256 ที่ฝั่ง client ไม่ส่งรหัสผ่านจริงไปเซิร์ฟเวอร์)
 > ต้องรัน `setupTriggers()` หนึ่งครั้ง (ผ่าน Apps Script editor) เพื่อให้ระบบเช็ค SLA รายชั่วโมง — รันไปแล้ว

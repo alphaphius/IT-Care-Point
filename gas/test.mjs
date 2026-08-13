@@ -100,6 +100,9 @@ function makeSandbox() {
         return ss;
       },
     },
+    LockService: {
+      getScriptLock: () => ({ waitLock: () => {}, releaseLock: () => {} }),
+    },
     DriveApp: {
       getFileById: (id) => {
         if (!files.has(id)) {
@@ -224,6 +227,8 @@ function run() {
   // ---- doGet defaults ----
   const hello = JSON.parse(s.doGet({}).content);
   assert.equal(hello.ok, true);
+  const health = JSON.parse(s.doGet({ parameter: { action: "health" } }).content);
+  assert.equal(health.data.service, "IT Care Point");
 
   // ---- register first user -> admin (bootstrap) ----
   const regA = register(s, A, "Alice Admin", "salt-aaaaaa", "hash-aaaaaa");
@@ -235,6 +240,12 @@ function run() {
   // ---- auth.salt returns stored salt + iterations ----
   assert.equal(post(s, "auth.salt", { email: A }).salt, "salt-aaaaaa");
   assert.equal(post(s, "auth.salt", { email: A }).iterations, 100000);
+  // Browser client also sends action in the query string. Keep this contract covered.
+  const queryAction = s.doPost({
+    parameter: { action: "auth.salt" },
+    postData: { contents: JSON.stringify({ email: A }) },
+  });
+  assert.equal(JSON.parse(queryAction.content).data.salt, "salt-aaaaaa");
 
   // ---- login rejects wrong hash / unknown email ----
   assert.equal(postErr(s, "auth.login", { email: A, hash: "hash-wronggg" }).code, "auth");
@@ -423,18 +434,34 @@ function run() {
   // ---- second login shares same DB (props path) ----
   const codeD = register(s, "d@itcp.test", "Dee User", "salt-dddddd", "hash-dddddd").token;
   const allD = post(s, "tickets.list", { token: codeD, scope: "all" }).tickets;
-  assert.equal(allD.length, 2);
+  assert.equal(allD.length, 0);
+
+  // ---- authorization boundaries ----
+  assert.match(postErr(s, "messages.send", {
+    token: codeD,
+    ticket_id: newTicket.id,
+    body: "should be denied",
+  }).error, /ไม่มีสิทธิ์/);
+  assert.match(postErr(s, "users.remove", { token: codeA, email: A }).error, /ตนเอง/);
 
   // ---- self-heal: removing last admin & staff -> next register becomes admin ----
   assert.ok(post(s, "users.remove", { token: codeA, email: B }).removed);
-  assert.ok(post(s, "users.remove", { token: codeA, email: A }).removed);
+  post(s, "settings.update", {
+    token: codeA,
+    settings: { ...post(s, "session", { token: codeA }).settings, admin_emails: [A, C] },
+  });
+  assert.ok(post(s, "users.remove", { token: codeC, email: A }).removed);
+  post(s, "settings.update", {
+    token: codeC,
+    settings: { ...post(s, "session", { token: codeC }).settings, admin_emails: ["missing@itcp.test"], staff_emails: [] },
+  });
   const regG = register(s, "g@itcp.test", "Gus Admin", "salt-gggggg", "hash-gggggg");
   assert.equal(regG.user.role, "admin");
   assert.deepEqual(regG.settings.admin_emails, ["g@itcp.test"]);
 
   const dump = s.__dump();
-  assert.deepEqual(dump.fileShare, ["ANYONE_WITH_LINK", "EDIT"]);
-  assert.deepEqual(dump.folderShare, ["ANYONE_WITH_LINK", "EDIT"]);
+  assert.equal(dump.fileShare, null);
+  assert.equal(dump.folderShare, null);
 
   console.log("GAS TEST: ALL PASS");
 }

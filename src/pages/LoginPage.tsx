@@ -143,16 +143,14 @@ export function LoginPage() {
             </Button>
           </form>
 
-          {!cfg.apiUrl && (
-            <Button
-              variant="outline"
-              className="mt-3 w-full"
-              onClick={() => nav("/setup")}
-            >
-              <SlidersHorizontal size={16} />
-              ตั้งค่าครั้งแรก
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            className="mt-3 w-full"
+            onClick={() => nav("/setup")}
+          >
+            <SlidersHorizontal size={16} />
+            {cfg.apiUrl ? "ตรวจสอบการเชื่อมต่อ API" : "ตั้งค่าครั้งแรก"}
+          </Button>
         </div>
         <p className="mt-4 text-center text-xs text-zinc-400">
           ผู้ที่สมัครสมาชิกเป็นคนแรกของระบบจะได้สิทธิ์ผู้ดูแลระบบ

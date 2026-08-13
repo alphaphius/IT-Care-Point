@@ -45,12 +45,30 @@ async function call<T>(
 ): Promise<T> {
   const method = opts.method ?? "POST";
   const token = getToken();
-  const payload: Record<string, unknown> = { ...body };
+  // Keep the action in both the query string and body. Apps Script deployments
+  // in the wild may route from either location, and POST handlers receive both.
+  const payload: Record<string, unknown> = { action, ...body };
   if (token) payload.token = token;
   const target = url(action);
 
   let lastErr = new ApiError("ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ ตรวจสอบอินเทอร์เน็ต", "network");
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  // Retrying mutations can create duplicate tickets/messages when Apps Script
+  // completes a write but the response is lost. Only retry explicitly safe reads.
+  const retryable = new Set([
+    "health",
+    "auth.salt",
+    "session",
+    "users.list",
+    "settings.get",
+    "tickets.list",
+    "tickets.get",
+    "notifications.list",
+    "assets.list",
+    "dashboard",
+    "pm.list",
+  ]).has(action);
+  const maxAttempts = retryable ? 3 : 1;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     if (attempt > 1) await new Promise((r) => setTimeout(r, 1200 * attempt));
     let res: Response;
     try {
@@ -64,6 +82,14 @@ async function call<T>(
       continue;
     }
     const text = await res.text();
+    if (!res.ok) {
+      throw new ApiError(
+        res.status === 403
+          ? "Apps Script deployment ไม่อนุญาตให้เข้าถึง กรุณาตรวจสิทธิ์ Web App"
+          : `เซิร์ฟเวอร์ตอบกลับ HTTP ${res.status}`,
+        "http",
+      );
+    }
     let data: { ok: boolean; data?: T; error?: string; code?: string };
     try {
       data = JSON.parse(text);
@@ -86,6 +112,8 @@ export interface AuthResult {
 }
 
 export const api = {
+  health: () => call<{ service: string; version: string }>("health", {}, { method: "GET" }),
+
   authSalt: (email: string) =>
     call<{ salt: string; iterations: number }>("auth.salt", { email }),
 

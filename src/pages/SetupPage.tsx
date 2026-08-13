@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Check, Palette, FloppyDisk, ArrowLeft } from "@phosphor-icons/react";
 import { Button, Field, Input } from "@/components/ui";
 import { applyConfig, isHexColor, loadConfig, saveConfig } from "@/lib/config";
+import { api, ApiError } from "@/lib/api";
 import { useToast } from "@/components/ui";
 
 const ACCENTS = [
@@ -63,12 +64,27 @@ export function SetupPage() {
       return;
     }
     setSaving(true);
+    const previous = loadConfig();
     try {
       const cfg = { ...form, apiUrl: form.apiUrl.trim() };
       saveConfig(cfg);
       applyConfig(cfg);
+      const health = await api.health();
+      if (health.service !== "IT Care Point") {
+        throw new Error("ไม่ใช่ API ของ IT Care Point");
+      }
       toast("success", "บันทึกการตั้งค่าแล้ว");
       nav("/login");
+    } catch (err) {
+      saveConfig(previous);
+      applyConfig(previous);
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "ไม่สามารถเชื่อมต่อ API ได้",
+      );
     } finally {
       setSaving(false);
     }

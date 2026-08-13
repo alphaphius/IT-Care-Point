@@ -19,14 +19,15 @@
 var SPREADSHEET_ID_KEY = "SPREADSHEET_ID";
 var FOLDER_ID_KEY = "ATTACH_FOLDER_ID";
 var SESSION_TTL_MS = 14 * 24 * 60 * 60 * 1000; // 14 days
+var API_VERSION = "1.1.0";
+var MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024;
 
 /* ============ Entry points ============ */
 
 function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) || "";
-  if (action === "ensure") {
-    initSheets(getSpreadsheet());
-    return json({ ok: true, data: { sheets: Object.keys(SHEET_DEFS) } });
+  if (action === "health") {
+    return json({ ok: true, data: { service: "IT Care Point", version: API_VERSION } });
   }
   return json({ ok: true, data: { hello: "IT Care Point" } });
 }
@@ -38,7 +39,7 @@ function doPost(e) {
   } catch (err) {
     return errJson("ข้อมูลไม่ถูกต้อง", "bad-json");
   }
-  var action = body.action || "";
+  var action = body.action || (e && e.parameter && e.parameter.action) || "";
   try {
     if (action === "auth.salt") return json({ ok: true, data: authSalt(body) });
     if (action === "auth.register") return json({ ok: true, data: authRegister(body) });
@@ -57,7 +58,7 @@ function route(action, body, user) {
   switch (action) {
     case "session": return sessionPayload(user);
     case "users.list": requireAdmin(user); return { users: listUsers() };
-    case "users.remove": requireAdmin(user); return { removed: removeUser(body.email) };
+    case "users.remove": requireAdmin(user); return { removed: removeUser(body.email, user.email) };
     case "settings.get": requireAdmin(user); return { settings: getSettings() };
     case "settings.update": requireAdmin(user); setSettings(body.settings); return { settings: getSettings() };
     case "tickets.list": return { tickets: listTickets(body.scope, user) };
@@ -67,7 +68,7 @@ function route(action, body, user) {
     case "tickets.assign": return { ticket: assignTicket(body.id, body.assignee_email, user) };
     case "messages.send": return { message: sendMessage(body, user) };
     case "notifications.list": return listNotifications(user.email);
-    case "notifications.read": markNotificationsRead(body.ids || []); return { ok: true };
+    case "notifications.read": markNotificationsRead(body.ids || [], user.email); return { ok: true };
     case "assets.list": return { assets: listAssets() };
     case "assets.create": requireAdmin(user); return { asset: createAsset(body, user) };
     case "dashboard": requireAdmin(user); return dashboard();
@@ -97,11 +98,17 @@ function authRegister(body) {
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("รูปแบบอีเมลไม่ถูกต้อง");
   if (name.length < 2) throw new Error("กรุณากรอกชื่อ");
   if (salt.length < 8 || hash.length < 8) throw new Error("ข้อมูลการเข้ารหัสไม่ถูกต้อง");
-  if (findUser(email)) throw new Error("มีผู้ใช้ในระบบนี้แล้ว");
-  appendRow("Users", {
-    email: email, name: name, salt: salt, hash: hash,
-    created_at: new Date().toISOString()
-  });
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    if (findUser(email)) throw new Error("มีผู้ใช้ในระบบนี้แล้ว");
+    appendRow("Users", {
+      email: email, name: name, salt: salt, hash: hash,
+      created_at: new Date().toISOString()
+    });
+  } finally {
+    lock.releaseLock();
+  }
   bootstrapAdmin(email, name);
   return issueSession(email, name);
 }
@@ -189,11 +196,13 @@ function listUsers() {
   });
 }
 
-function removeUser(email) {
+function removeUser(email, actorEmail) {
   email = String(email || "").toLowerCase().trim();
   if (!email) throw new Error("ระบุอีเมลผู้ใช้");
+  if (email === actorEmail) throw new Error("ไม่สามารถลบบัญชีของตนเองได้");
   var sh = getSheet("Users");
   var last = sh.getLastRow();
+  if (last < 2) throw new Error("ไม่พบผู้ใช้");
   var headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
   var values = sh.getRange(2, 1, last - 1, sh.getLastColumn()).getValues();
   var emailCol = headers.indexOf("email");
@@ -202,6 +211,7 @@ function removeUser(email) {
   }
   var sess = getSheet("Sessions");
   var lastS = sess.getLastRow();
+  if (lastS < 2) return email;
   var headersS = sess.getRange(1, 1, 1, sess.getLastColumn()).getValues()[0];
   var valuesS = sess.getRange(2, 1, lastS - 1, sess.getLastColumn()).getValues();
   var emailColS = headersS.indexOf("email");
@@ -254,13 +264,21 @@ function setSetting(key, value) {
 }
 
 function bootstrapAdmin(email, name) {
-  var s = getSettings();
-  var validAdmins = s.admin_emails.filter(function (e) { return findUser(e); });
-  var validStaff = s.staff_emails.filter(function (e) { return findUser(e); });
-  if (validAdmins.length === 0 && validStaff.length === 0) {
-    setSettings({ staff_emails: [], admin_emails: [email], sla_hours: s.sla_hours });
-    notify(email, "", "ยินดีต้อนรับ! คุณเป็นผู้ดูแลระบบคนแรกของ " + name, false);
+  var promoted = false;
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var s = getSettings();
+    var validAdmins = s.admin_emails.filter(function (e) { return findUser(e); });
+    var validStaff = s.staff_emails.filter(function (e) { return findUser(e); });
+    if (validAdmins.length === 0 && validStaff.length === 0) {
+      setSettings({ staff_emails: [], admin_emails: [email], sla_hours: s.sla_hours, email_notify: s.email_notify });
+      promoted = true;
+    }
+  } finally {
+    lock.releaseLock();
   }
+  if (promoted) notify(email, "", "ยินดีต้อนรับ! คุณเป็นผู้ดูแลระบบคนแรกของ " + name);
 }
 
 function sessionPayload(user) {
@@ -275,7 +293,7 @@ function sessionPayload(user) {
 function listTickets(scope, user) {
   var rows = getRows("Tickets");
   var out = rows.map(rowToTicket).sort(function (a, b) { return b.opened_at.localeCompare(a.opened_at); });
-  if (scope === "mine") out = out.filter(function (t) { return t.reporter_email === user.email; });
+  if (user.role === "user" || scope === "mine") out = out.filter(function (t) { return t.reporter_email === user.email; });
   if (scope === "open") out = out.filter(function (t) { return !isClosed(t.status); });
   return out;
 }
@@ -295,15 +313,22 @@ function getTicket(id, user) {
 
 function createTicket(body, user) {
   var s = getSettings();
-  var hours = s.sla_hours[body.urgency] || 24;
+  var subject = String(body.subject || "").trim().slice(0, 200);
+  var description = String(body.description || "").trim().slice(0, 5000);
+  var urgency = String(body.urgency || "medium");
+  var allowedUrgencies = ["low", "medium", "high", "critical"];
+  if (!subject) throw new Error("กรุณาระบุหัวข้องาน");
+  if (!description) throw new Error("กรุณาอธิบายปัญหา");
+  if (allowedUrgencies.indexOf(urgency) < 0) throw new Error("ระดับความเร่งด่วนไม่ถูกต้อง");
+  var hours = s.sla_hours[urgency] || 24;
   var now = new Date();
   var id = "T" + now.getFullYear() + pad(now.getMonth() + 1) + pad(now.getDate()) + "-" + pad(nextSeq("tickets"));
   var rec = {
     id: id,
-    subject: String(body.subject || "").slice(0, 200),
-    category: body.category || "Other",
-    urgency: body.urgency || "medium",
-    description: String(body.description || "").slice(0, 5000),
+    subject: subject,
+    category: String(body.category || "Other").trim().slice(0, 100),
+    urgency: urgency,
+    description: description,
     reporter_email: user.email,
     reporter_name: user.name,
     status: "Received",
@@ -340,7 +365,6 @@ function updateTicket(id, patch, user) {
   var rec = null;
   for (var i = 0; i < rows.length; i++) if (rows[i].id === id) { rec = rows[i]; break; }
   if (!rec) throw new Error("ไม่พบงานนี้");
-  var prev = rowToTicket(rec);
   if (user.role === "user" && rec.reporter_email !== user.email) throw new Error("คุณไม่มีสิทธิ์แก้ไขงานนี้");
   var changes = {};
   var now = new Date();
@@ -358,15 +382,26 @@ function updateTicket(id, patch, user) {
       } else if (patch.status === "Canceled") {
         changes.status = "Canceled";
         changes.closed_at = now.toISOString();
-      } else {
+      } else if (["Received", "In Progress", "Pending Parts"].indexOf(patch.status) >= 0) {
         changes.status = patch.status;
+      } else {
+        throw new Error("สถานะงานไม่ถูกต้อง");
       }
     }
   }
-  if (patch.escalated !== undefined) changes.escalated = patch.escalated ? true : false;
-  if (patch.rating !== undefined) changes.rating = String(patch.rating);
-  if (patch.feedback !== undefined) changes.feedback = String(patch.feedback).slice(0, 2000);
-  if (patch.asset_tag !== undefined) changes.asset_tag = patch.asset_tag;
+  if (user.role !== "user" && patch.escalated !== undefined) changes.escalated = patch.escalated ? true : false;
+  if (patch.rating !== undefined || patch.feedback !== undefined) {
+    if (user.role !== "user" || rec.reporter_email !== user.email || rec.status !== "Resolved") {
+      throw new Error("ประเมินได้เฉพาะผู้แจ้งหลังงานเสร็จแล้ว");
+    }
+    if (patch.rating !== undefined) {
+      var rating = Number(patch.rating);
+      if (rating < 1 || rating > 5 || rating % 1 !== 0) throw new Error("คะแนนต้องอยู่ระหว่าง 1-5");
+      changes.rating = String(rating);
+    }
+    if (patch.feedback !== undefined) changes.feedback = String(patch.feedback).slice(0, 2000);
+  }
+  if (user.role !== "user" && patch.asset_tag !== undefined) changes.asset_tag = String(patch.asset_tag).slice(0, 100);
 
   if (Object.keys(changes).length) {
     updateRow("Tickets", "id", id, changes);
@@ -384,13 +419,16 @@ function updateTicket(id, patch, user) {
     if (changes.status === "Resolved") notify(rec.assignee_email, id, "งาน #" + id + " ถูกประเมินโดยผู้แจ้งแล้ว");
   }
   if (changes.escalated && changes.escalated) {
-    notifyAdmins("งาน #" + id, "งานถูก Escalate: " + rec.subject);
+    notifyAdmins("งานถูก Escalate: " + rec.subject, id);
   }
   return rowToTicket(rec);
 }
 
 function assignTicket(id, assigneeEmail, user) {
   requireStaff(user);
+  assigneeEmail = String(assigneeEmail || "").toLowerCase().trim();
+  var assigneeRole = roleOf(assigneeEmail);
+  if (assigneeRole !== "staff" && assigneeRole !== "admin") throw new Error("ผู้รับงานต้องเป็นเจ้าหน้าที่หรือผู้ดูแลระบบ");
   var rows = getRows("Tickets");
   var rec = null;
   for (var i = 0; i < rows.length; i++) if (rows[i].id === id) { rec = rows[i]; break; }
@@ -411,7 +449,9 @@ function assignTicket(id, assigneeEmail, user) {
 function sendMessage(body, user) {
   var ticket = findTicket(body.ticket_id);
   if (!ticket) throw new Error("ไม่พบงานนี้");
+  if (user.role === "user" && ticket.reporter_email !== user.email) throw new Error("คุณไม่มีสิทธิ์ส่งข้อความในงานนี้");
   if (isClosed(ticket.status)) throw new Error("งานปิดแล้ว ไม่สามารถส่งข้อความได้");
+  if (!String(body.body || "").trim() && !body.attachment) throw new Error("กรุณาพิมพ์ข้อความหรือแนบไฟล์");
   var now = new Date();
   var id = "M" + nextSeq("messages");
   var rec = {
@@ -446,7 +486,11 @@ function sendMessage(body, user) {
 
 function saveAttachment(att, ticketId) {
   var folder = getAttachFolder();
-  var base64 = att.data || "";
+  var base64 = String(att.data || "");
+  var estimatedBytes = Math.floor(base64.length * 3 / 4);
+  if (!att.name || !base64) throw new Error("ไฟล์แนบไม่สมบูรณ์");
+  if (estimatedBytes > MAX_ATTACHMENT_BYTES) throw new Error("ไฟล์แนบต้องไม่เกิน 8 MB");
+  if (["image", "video"].indexOf(att.kind) < 0) throw new Error("รองรับเฉพาะไฟล์ภาพหรือวิดีโอ");
   var bytes = Utilities.base64Decode(base64);
   var blob = Utilities.newBlob(bytes, guessMime(att.name, att.kind), safeName(ticketId + "-" + att.name));
   var file = folder.createFile(blob);
@@ -461,7 +505,6 @@ function getAttachFolder() {
     if (id) return DriveApp.getFolderById(id);
   } catch (e) { /* recreate */ }
   var folder = DriveApp.createFolder("IT Care Point Attachments");
-  folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.EDIT);
   props.setProperty(FOLDER_ID_KEY, folder.getId());
   return folder;
 }
@@ -534,10 +577,10 @@ function listNotifications(email) {
   return { items: items, unread: unread };
 }
 
-function markNotificationsRead(ids) {
+function markNotificationsRead(ids, email) {
   var rows = getRows("Notifications");
   for (var i = 0; i < rows.length; i++) {
-    if (ids.indexOf(rows[i].id) >= 0) updateRow("Notifications", "id", rows[i].id, { read: "true" });
+    if (rows[i].email === email && ids.indexOf(rows[i].id) >= 0) updateRow("Notifications", "id", rows[i].id, { read: "true" });
   }
 }
 
@@ -629,6 +672,29 @@ function setupTriggers() {
   ScriptApp.newTrigger("checkSla").timeBased().everyHours(1).create();
 }
 
+function setupSystem() {
+  var ss = getSpreadsheet();
+  initSheets(ss);
+  hardenStoragePermissions(ss);
+  return { spreadsheet_id: ss.getId(), sheets: Object.keys(SHEET_DEFS) };
+}
+
+function hardenStoragePermissions(ss) {
+  try {
+    DriveApp.getFileById(ss.getId()).setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
+  } catch (e) {
+    Logger.log("DB_PERMISSION_HARDEN_FAIL: " + e);
+  }
+  var folderId = PropertiesService.getScriptProperties().getProperty(FOLDER_ID_KEY);
+  if (folderId) {
+    try {
+      DriveApp.getFolderById(folderId).setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
+    } catch (e2) {
+      Logger.log("FOLDER_PERMISSION_HARDEN_FAIL: " + e2);
+    }
+  }
+}
+
 function checkSla() {
   var rows = getRows("Tickets");
   var now = new Date();
@@ -638,7 +704,7 @@ function checkSla() {
     if (rec.escalated === true || rec.escalated === "true") return;
     if (rec.sla_deadline && new Date(rec.sla_deadline) < now) {
       updateRow("Tickets", "id", rec.id, { escalated: true });
-      notifyAdmins("งานเกิน SLA #" + rec.id, rec.subject);
+      notifyAdmins("งานเกิน SLA: " + rec.subject, rec.id);
       if (s.email_notify) mailToStaff("งานเกิน SLA #" + rec.id, "งาน: " + rec.subject);
     }
   });
@@ -654,7 +720,6 @@ function getSpreadsheet() {
   }
   var ss = SpreadsheetApp.create("IT Care Point Database");
   props.setProperty(SPREADSHEET_ID_KEY, ss.getId());
-  DriveApp.getFileById(ss.getId()).setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.EDIT);
   initSheets(ss);
   return ss;
 }
@@ -675,9 +740,6 @@ function initSheets(ss) {
     var sh = ss.getSheetByName(name);
     if (!sh) sh = ss.insertSheet(name);
     ensureHeaders(sh, name);
-  });
-  ss.getSheets().forEach(function (sh) {
-    if (!SHEET_DEFS[sh.getName()]) ss.deleteSheet(sh);
   });
   ensureSetting("seq_tickets", "0");
 }
@@ -753,13 +815,20 @@ function updateRow(name, keyField, keyValue, changes) {
 }
 
 function nextSeq(name) {
-  var key = "seq_" + name;
-  var rows = getRows("Settings");
-  var val = 0;
-  for (var i = 0; i < rows.length; i++) if (rows[i].key === key) val = Number(rows[i].value) || 0;
-  val++;
-  setSetting(key, String(val));
-  return val;
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var key = "seq_" + name;
+    var rows = getRows("Settings");
+    var val = 0;
+    for (var i = 0; i < rows.length; i++) if (rows[i].key === key) val = Number(rows[i].value) || 0;
+    val++;
+    setSetting(key, String(val));
+    SpreadsheetApp.flush();
+    return val;
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /* ============ Mapping helpers ============ */

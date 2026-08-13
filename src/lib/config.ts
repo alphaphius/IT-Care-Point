@@ -7,7 +7,9 @@ export interface AppConfig {
 }
 
 const KEY = "itcp:config";
-const VERSION = 4;
+// Bump whenever the built-in deployment changes so stale PWA clients do not
+// keep calling a retired Apps Script URL from localStorage.
+const VERSION = 5;
 
 export const DEFAULT_LOGO =
   "https://cdn-icons-png.flaticon.com/512/2706/2706950.png";
@@ -15,7 +17,7 @@ export const DEFAULT_LOGO =
 export function defaultConfig(): AppConfig {
   return {
     apiUrl:
-      "https://script.google.com/macros/s/AKfycbzMwUDYBHCBqRiYe92fXnYVjYJWfQHLRGql9S4KwCTsiHprUUMxgFsJOqQnD6aYllCt2A/exec",
+      "https://script.google.com/macros/s/AKfycbyJIljEShjvEbXc838CSEjA1JRT7C3WTuphp1fCJ-qrMlsKUfMgYFPY3BEE0HUAupUMbQ/exec",
     appName: "IT Care Point",
     logoUrl: DEFAULT_LOGO,
     accent: "#0f766e",
