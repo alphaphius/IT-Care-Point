@@ -61,6 +61,10 @@ export function AdminSettings() {
   }, [settings]);
 
   const saveApp = async () => {
+    if (!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(cfg.scriptUrl.trim())) {
+      setCfgError("URL ของ Apps Script ต้องอยู่ในรูปแบบ https://script.google.com/macros/s/.../exec");
+      return;
+    }
     if (cfg.appName.trim().length < 2) {
       setCfgError("กรุณากรอกชื่อแอป");
       return;
@@ -129,6 +133,18 @@ export function AdminSettings() {
           ชื่อ, โลโก้ และสีหลัก ใช้ได้ทั้งแอป
         </p>
         <div className="mt-4 flex flex-col gap-5">
+          <Field label="URL ของ Apps Script (ต้องลงท้ายด้วย /exec)">
+            <Input
+              value={cfg.scriptUrl}
+              onChange={(e) => {
+                setCfg((p) => ({ ...p, scriptUrl: e.target.value }));
+                setCfgError(null);
+              }}
+              inputMode="url"
+              className="font-mono text-xs"
+            />
+          </Field>
+
           <Field label="ชื่อแอป">
             <Input
               value={cfg.appName}

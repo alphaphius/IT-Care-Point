@@ -13,7 +13,8 @@ export const DEFAULT_LOGO =
 
 export function defaultConfig(): AppConfig {
   return {
-    scriptUrl: "",
+    scriptUrl:
+      "https://script.google.com/macros/s/AKfycbzixqTu8NwASw3hl6f_4iKW0EIDpz7KUvenyHE4nXjeItqXGaJkSDtbmjbEjLmC1DX1Pg/exec",
     appName: "IT Care Point",
     logoUrl: DEFAULT_LOGO,
     accent: "#0f766e",
