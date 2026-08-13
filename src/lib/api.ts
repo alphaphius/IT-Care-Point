@@ -32,7 +32,7 @@ export function setToken(t: string | null) {
 }
 
 function url(action: string) {
-  const base = loadConfig().scriptUrl.replace(/\/+$/, "");
+  const base = loadConfig().apiUrl.replace(/\/+$/, "");
   if (!base) throw new ApiError("ยังไม่ได้ตั้งค่า URL ของ Apps Script", "no-config");
   const sep = base.includes("?") ? "&" : "?";
   return `${base}${sep}action=${action}`;
@@ -52,7 +52,7 @@ async function call<T>(
   try {
     res = await fetch(url(action), {
       method,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: method === "POST" ? JSON.stringify(payload) : undefined,
     });
   } catch {

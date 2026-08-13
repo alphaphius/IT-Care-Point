@@ -1,5 +1,6 @@
 export interface AppConfig {
   scriptUrl: string;
+  apiUrl: string;
   appName: string;
   logoUrl: string;
   accent: string;
@@ -7,7 +8,7 @@ export interface AppConfig {
 }
 
 const KEY = "itcp:config";
-const VERSION = 2;
+const VERSION = 3;
 
 export const DEFAULT_LOGO =
   "https://cdn-icons-png.flaticon.com/512/2706/2706950.png";
@@ -16,6 +17,8 @@ export function defaultConfig(): AppConfig {
   return {
     scriptUrl:
       "https://script.google.com/macros/s/AKfycbzixqTu8NwASw3hl6f_4iKW0EIDpz7KUvenyHE4nXjeItqXGaJkSDtbmjbEjLmC1DX1Pg/exec",
+    apiUrl:
+      "https://script.google.com/macros/s/AKfycbysjvfKAZ_y2wTzzZvAruN_4YMp95KIIF23KB9ESGKFRezug5mV5p-UAxm9IWza6UNJKw/exec",
     appName: "IT Care Point",
     logoUrl: DEFAULT_LOGO,
     accent: "#0f766e",

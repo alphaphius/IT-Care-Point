@@ -40,15 +40,17 @@ SPA deep-link รองรับแล้ว (มี `dist/404.html` ให้ G
 ## ติดตั้ง Backend (Google Apps Script)
 **สถานะ: deploy แล้วแล้ว** ที่ Script ID `1VVuO53LPkJZoVH0vwieVYujnIWDv9Usj2GsVNp2wgT1FwDDNv3vUqJx4`
 
-- Web app URL (ใช้ลงในหน้า Setup): `https://script.google.com/macros/s/AKfycbzixqTu8NwASw3hl6f_4iKW0EIDpz7KUvenyHE4nXjeItqXGaJkSDtbmjbEjLmC1DX1Pg/exec`
-- Execute as: **User accessing the web app** / Access: **Anyone with Google account**
+ต้องมี **2 deployment** (CORS: GAS รองรับ preflight ไม่ได้):
+- **URL ล็อกอิน** (Execute as: User accessing / Access: Anyone): `https://script.google.com/macros/s/AKfycbzixqTu8NwASw3hl6f_4iKW0EIDpz7KUvenyHE4nXjeItqXGaJkSDtbmjbEjLmC1DX1Pg/exec`
+- **URL API** (Execute as: Me / Access: Anyone, even anonymous): `https://script.google.com/macros/s/AKfycbysjvfKAZ_y2wTzzZvAruN_4YMp95KIIF23KB9ESGKFRezug5mV5p-UAxm9IWza6UNJKw/exec`
 
 ถ้าจะ deploy ใหม่ด้วยตัวเอง:
 1. ติดตั้ง clasp: `npm i -g @google/clasp` แล้ว `clasp login`
-2. ในโฟลเดอร์ `gas/`: `clasp push -f` แล้ว `clasp deploy -d "..."` (สร้าง version ใหม่)
+2. แก้ `gas/appsscript.json`:
+   - ครั้งแรก (login): `"executeAs": "USER_ACCESSING", "access": "ANYONE"` → `clasp deploy` → copy URL ไปใส่ช่อง "URL ล็อกอิน"
+   - ครั้งที่สอง (api): `"executeAs": "USER_DEPLOYING", "access": "ANYONE_ANONYMOUS"` → `clasp deploy` → copy URL ไปใส่ช่อง "URL API"
 3. เปิด console ของ backend รัน `setupTriggers()` หนึ่งครั้ง เพื่อตั้ง SLA trigger รายชั่วโมง
-4. ระบบฝัง URL `/exec` ไว้เป็นค่าเริ่มต้นแล้ว (หน้า Admin → ตั้งค่า → ข้อมูลแอป แก้ได้ถ้า deploy ใหม่)
-   ถ้า deploy เองและได้ URL ใหม่ ให้ไปแก้ที่หน้า Admin Settings แทนการตั้งค่าครั้งแรก
+4. แก้ URL ทั้ง 2 ช่องได้ที่หน้า Admin → ตั้งค่า → ข้อมูลแอป
 
 > ครั้งแรกที่เข้าใช้งาน จะสร้าง sheet: Tickets, Messages, Assets, PM, Settings, Sessions, Notifications ให้อัตโนมัติ
 > ผู้ใช้คนแรกเมื่อยังไม่มี admin จะกลายเป็น admin คนแรก

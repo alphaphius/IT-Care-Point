@@ -67,7 +67,7 @@ export function LoginPage() {
             <GoogleLogo size={18} weight="bold" />
             เข้าสู่ระบบด้วย Google
           </Button>
-          {!cfg.scriptUrl && (
+          {(!cfg.scriptUrl || !cfg.apiUrl) && (
             <Button variant="outline" onClick={() => nav("/setup")}>
               <SlidersHorizontal size={16} />
               ตั้งค่าครั้งแรก

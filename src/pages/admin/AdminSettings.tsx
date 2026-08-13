@@ -62,7 +62,11 @@ export function AdminSettings() {
 
   const saveApp = async () => {
     if (!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(cfg.scriptUrl.trim())) {
-      setCfgError("URL ของ Apps Script ต้องอยู่ในรูปแบบ https://script.google.com/macros/s/.../exec");
+      setCfgError("URL ล็อกอินต้องอยู่ในรูปแบบ https://script.google.com/macros/s/.../exec");
+      return;
+    }
+    if (!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(cfg.apiUrl.trim())) {
+      setCfgError("URL API ต้องอยู่ในรูปแบบ https://script.google.com/macros/s/.../exec");
       return;
     }
     if (cfg.appName.trim().length < 2) {
@@ -133,11 +137,23 @@ export function AdminSettings() {
           ชื่อ, โลโก้ และสีหลัก ใช้ได้ทั้งแอป
         </p>
         <div className="mt-4 flex flex-col gap-5">
-          <Field label="URL ของ Apps Script (ต้องลงท้ายด้วย /exec)">
+          <Field label="URL ล็อกอิน (Apps Script รันเป็นผู้ใช้)" hint="ใช้หน้าเข้าสู่ระบบ เปลี่ยนเมื่อ deploy ใหม่เท่านั้น">
             <Input
               value={cfg.scriptUrl}
               onChange={(e) => {
                 setCfg((p) => ({ ...p, scriptUrl: e.target.value }));
+                setCfgError(null);
+              }}
+              inputMode="url"
+              className="font-mono text-xs"
+            />
+          </Field>
+
+          <Field label="URL API (Apps Script แบบ Anonymous)" hint="ใช้เรียกข้อมูลทั้งหมด เปลี่ยนเมื่อ deploy ใหม่เท่านั้น">
+            <Input
+              value={cfg.apiUrl}
+              onChange={(e) => {
+                setCfg((p) => ({ ...p, apiUrl: e.target.value }));
                 setCfgError(null);
               }}
               inputMode="url"

@@ -38,7 +38,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings | null>(null);
 
   const refresh = async () => {
-    if (!loadConfig().scriptUrl) {
+    if (!loadConfig().apiUrl) {
       setStatus("no-config");
       return;
     }
