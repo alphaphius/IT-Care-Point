@@ -38,17 +38,21 @@ npm run test:gas                           # ทดสอบ logic ของ bac
 SPA deep-link รองรับแล้ว (มี `dist/404.html` ให้ GH Pages fallback ไปที่ app)
 
 ## ติดตั้ง Backend (Google Apps Script)
-1. เปิด https://script.google.com → New Project → วางโค้ดจาก `gas/Code.gs` ทั้งหมด (ลบโค้ดเริ่มต้นทิ้ง)
-2. ใน Apps Script editor เปิด Console (เพื่อตรวจ syntax ผ่าน)
-3. Deploy → New deployment → Web app
-   - Execute as: **User accessing the web app** (สำคัญมาก — ต้องเป็นแบบนี้ทุกครั้ง เพื่อให้ระบุตัวผู้ใช้แต่ละคนได้)
-   - Who has access: **Anyone with Google account**
-4. เปิด console ของ backend รัน `setupTriggers()` หนึ่งครั้ง เพื่อตั้ง SLA trigger รายชั่วโมง
-5. copy URL ที่ลงท้าย `/exec` ไปใส่ในหน้าตั้งค่าแอป (หน้าแรกของเว็บ)
-6. พิมพ์ GAS Script ID ที่ URL ของโปรเจกต์ (ส่วน `script.google.com/macros/s/<SCRIPT_ID>/...`) ลงในช่อง Script ID ด้วย
+**สถานะ: deploy แล้วแล้ว** ที่ Script ID `1VVuO53LPkJZoVH0vwieVYujnIWDv9Usj2GsVNp2wgT1FwDDNv3vUqJx4`
+
+- Web app URL (ใช้ลงในหน้า Setup): `https://script.google.com/macros/s/AKfycbzzh_zSySX2G-h6eukYisk0nVnE7BeZHtzK4XL6dvuIpXRWbT74JnEbmt22VELUAqN_nw/exec`
+- Execute as: **User accessing the web app** / Access: **Anyone with Google account**
+
+ถ้าจะ deploy ใหม่ด้วยตัวเอง:
+1. ติดตั้ง clasp: `npm i -g @google/clasp` แล้ว `clasp login`
+2. ในโฟลเดอร์ `gas/`: `clasp push -f` แล้ว `clasp deploy -d "..."` (สร้าง version ใหม่)
+3. เปิด console ของ backend รัน `setupTriggers()` หนึ่งครั้ง เพื่อตั้ง SLA trigger รายชั่วโมง
+4. copy URL ที่ลงท้าย `/exec` ไปใส่ในหน้าตั้งค่าแอป (หน้าแรกของเว็บ)
+5. พิมพ์ GAS Script ID (`1VVuO53LPkJZoVH0vwieVYujnIWDv9Usj2GsVNp2wgT1FwDDNv3vUqJx4`) ลงในช่อง Script ID ด้วย
 
 > ครั้งแรกที่เข้าใช้งาน จะสร้าง sheet: Tickets, Messages, Assets, PM, Settings, Sessions, Notifications ให้อัตโนมัติ
 > ผู้ใช้คนแรกเมื่อยังไม่มี admin จะกลายเป็น admin คนแรก
+> ผู้ใช้คนแรกต้องรัน `setupTriggers()` ก่อน ไม่งั้นระบบจะยังไม่เช็ค SLA อัตโนมัติ
 
 ## หมายเหตุ
 - สิทธิ์แยก: User / Staff / Admin (ตั้ง email ในหน้า Admin Settings)
