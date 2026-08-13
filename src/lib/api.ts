@@ -47,29 +47,36 @@ async function call<T>(
   const token = getToken();
   const payload: Record<string, unknown> = { ...body };
   if (token) payload.token = token;
+  const target = url(action);
 
-  let res: Response;
-  try {
-    res = await fetch(url(action), {
-      method,
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: method === "POST" ? JSON.stringify(payload) : undefined,
-    });
-  } catch {
-    throw new ApiError("ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ ตรวจสอบอินเทอร์เน็ต", "network");
+  let lastErr = new ApiError("ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ ตรวจสอบอินเทอร์เน็ต", "network");
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    if (attempt > 1) await new Promise((r) => setTimeout(r, 1200 * attempt));
+    let res: Response;
+    try {
+      res = await fetch(target, {
+        method,
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: method === "POST" ? JSON.stringify(payload) : undefined,
+      });
+    } catch {
+      lastErr = new ApiError("ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ ตรวจสอบอินเทอร์เน็ต", "network");
+      continue;
+    }
+    const text = await res.text();
+    let data: { ok: boolean; data?: T; error?: string; code?: string };
+    try {
+      data = JSON.parse(text);
+    } catch {
+      lastErr = new ApiError("เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง", "bad-response");
+      continue;
+    }
+    if (!data.ok) {
+      throw new ApiError(data.error || "เกิดข้อผิดพลาด", data.code);
+    }
+    return data.data as T;
   }
-
-  const text = await res.text();
-  let data: { ok: boolean; data?: T; error?: string; code?: string };
-  try {
-    data = JSON.parse(text);
-  } catch {
-    throw new ApiError("เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง", "bad-response");
-  }
-  if (!data.ok) {
-    throw new ApiError(data.error || "เกิดข้อผิดพลาด", data.code);
-  }
-  return data.data as T;
+  throw lastErr;
 }
 
 export interface AuthResult {
@@ -89,6 +96,10 @@ export const api = {
     call<AuthResult>("auth.login", { email, hash }),
 
   session: () => call<{ user: UserProfile; settings: AppSettings }>("session"),
+
+  usersList: () => call<{ users: { email: string; name: string; created_at: string }[] }>("users.list"),
+
+  usersRemove: (email: string) => call<{ removed: string }>("users.remove", { email }),
 
   settingsGet: () => call<{ settings: AppSettings }>("settings.get"),
 

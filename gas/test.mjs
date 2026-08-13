@@ -26,6 +26,9 @@ function makeSandbox() {
         else d.rows.push([...arr]);
       },
       setFrozenRows: () => {},
+      deleteRow: (row) => {
+        d.rows.splice(row - 2, 1);
+      },
       getRange: (r, c, numRows, numCols) => {
         if (numRows !== undefined) {
           if (r === 1) {
@@ -91,6 +94,7 @@ function makeSandbox() {
     },
     SpreadsheetApp: {
       create: () => ss,
+      flush: () => {},
       openById: (id) => {
         if (id !== ss.getId()) throw new Error("no access to spreadsheet");
         return ss;
@@ -259,6 +263,16 @@ function run() {
   assert.equal(regB.user.role, "staff");
   const codeB = regB.token;
   const codeC = register(s, C, "Cara User", "salt-cccccc", "hash-cccccc").token;
+
+  // ---- users.list (admin only) ----
+  assert.deepEqual(post(s, "users.list", { token: codeA }).users.map((u) => u.email), [A, B, C]);
+  assert.match(postErr(s, "users.list", { token: codeC }).error, /ผู้ดูแล/);
+
+  // ---- users.remove deletes user + sessions ----
+  const codeD0 = register(s, "d@itcp.test", "Dee User", "salt-dddddd", "hash-dddddd").token;
+  assert.ok(post(s, "users.remove", { token: codeA, email: "d@itcp.test" }).removed);
+  assert.equal(postErr(s, "session", { token: codeD0 }).code, "auth");
+  assert.deepEqual(post(s, "users.list", { token: codeA }).users.map((u) => u.email), [A, B, C]);
   const newTicket = post(s, "tickets.create", {
     token: codeC,
     subject: "คอมพิวเตอร์เปิดไม่ติด",

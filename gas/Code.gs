@@ -56,6 +56,8 @@ function doPost(e) {
 function route(action, body, user) {
   switch (action) {
     case "session": return sessionPayload(user);
+    case "users.list": requireAdmin(user); return { users: listUsers() };
+    case "users.remove": requireAdmin(user); return { removed: removeUser(body.email) };
     case "settings.get": requireAdmin(user); return { settings: getSettings() };
     case "settings.update": requireAdmin(user); setSettings(body.settings); return { settings: getSettings() };
     case "tickets.list": return { tickets: listTickets(body.scope, user) };
@@ -155,6 +157,7 @@ function createSession(email, name) {
     created_at: now.toISOString(),
     expires_at: new Date(now.getTime() + SESSION_TTL_MS).toISOString()
   });
+  SpreadsheetApp.flush();
   return token;
 }
 
@@ -178,6 +181,34 @@ function requireAdmin(user) {
 
 function requireStaff(user) {
   if (user.role !== "staff" && user.role !== "admin") throw new Error("ต้องเป็นเจ้าหน้าที่ IT");
+}
+
+function listUsers() {
+  return getRows("Users").map(function (r) {
+    return { email: r.email, name: r.name, created_at: r.created_at };
+  });
+}
+
+function removeUser(email) {
+  email = String(email || "").toLowerCase().trim();
+  if (!email) throw new Error("ระบุอีเมลผู้ใช้");
+  var sh = getSheet("Users");
+  var last = sh.getLastRow();
+  var headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  var values = sh.getRange(2, 1, last - 1, sh.getLastColumn()).getValues();
+  var emailCol = headers.indexOf("email");
+  for (var r = values.length - 1; r >= 0; r--) {
+    if (String(values[r][emailCol]) === email) sh.deleteRow(r + 2);
+  }
+  var sess = getSheet("Sessions");
+  var lastS = sess.getLastRow();
+  var headersS = sess.getRange(1, 1, 1, sess.getLastColumn()).getValues()[0];
+  var valuesS = sess.getRange(2, 1, lastS - 1, sess.getLastColumn()).getValues();
+  var emailColS = headersS.indexOf("email");
+  for (var rs = valuesS.length - 1; rs >= 0; rs--) {
+    if (String(valuesS[rs][emailColS]) === email) sess.deleteRow(rs + 2);
+  }
+  return email;
 }
 
 /* ============ Settings ============ */
