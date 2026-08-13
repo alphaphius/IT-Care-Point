@@ -7,6 +7,7 @@ export interface AppConfig {
 }
 
 const KEY = "itcp:config";
+const VERSION = 2;
 
 export const DEFAULT_LOGO =
   "https://cdn-icons-png.flaticon.com/512/2706/2706950.png";
@@ -26,14 +27,16 @@ export function loadConfig(): AppConfig {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return defaultConfig();
-    return { ...defaultConfig(), ...(JSON.parse(raw) as Partial<AppConfig>) };
+    const stored = JSON.parse(raw) as Partial<AppConfig> & { version?: number };
+    if (stored.version !== VERSION) return defaultConfig();
+    return { ...defaultConfig(), ...stored };
   } catch {
     return defaultConfig();
   }
 }
 
 export function saveConfig(c: AppConfig) {
-  localStorage.setItem(KEY, JSON.stringify(c));
+  localStorage.setItem(KEY, JSON.stringify({ ...c, version: VERSION }));
 }
 
 export function applyConfig(c: AppConfig) {

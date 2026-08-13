@@ -47,11 +47,12 @@ SPA deep-link รองรับแล้ว (มี `dist/404.html` ให้ G
 1. ติดตั้ง clasp: `npm i -g @google/clasp` แล้ว `clasp login`
 2. ในโฟลเดอร์ `gas/`: `clasp push -f` แล้ว `clasp deploy -d "..."` (สร้าง version ใหม่)
 3. เปิด console ของ backend รัน `setupTriggers()` หนึ่งครั้ง เพื่อตั้ง SLA trigger รายชั่วโมง
-4. copy URL ที่ลงท้าย `/exec` ไปใส่ในหน้าตั้งค่าแอป (หน้าแรกของเว็บ)
+4. ระบบฝัง URL `/exec` ไว้เป็นค่าเริ่มต้นแล้ว (หน้า Admin → ตั้งค่า → ข้อมูลแอป แก้ได้ถ้า deploy ใหม่)
+   ถ้า deploy เองและได้ URL ใหม่ ให้ไปแก้ที่หน้า Admin Settings แทนการตั้งค่าครั้งแรก
 
 > ครั้งแรกที่เข้าใช้งาน จะสร้าง sheet: Tickets, Messages, Assets, PM, Settings, Sessions, Notifications ให้อัตโนมัติ
 > ผู้ใช้คนแรกเมื่อยังไม่มี admin จะกลายเป็น admin คนแรก
-> ผู้ใช้คนแรกต้องรัน `setupTriggers()` ก่อน ไม่งั้นระบบจะยังไม่เช็ค SLA อัตโนมัติ
+> ต้องรัน `setupTriggers()` หนึ่งครั้ง (ผ่าน Apps Script editor) เพื่อให้ระบบเช็ค SLA รายชั่วโมง — รันไปแล้ว
 
 ## หมายเหตุ
 - สิทธิ์แยก: User / Staff / Admin (ตั้ง email ในหน้า Admin Settings)

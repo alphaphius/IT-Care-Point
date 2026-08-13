@@ -70,7 +70,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setToken(res.token);
     setUser(res.user);
     const s = await api.session().catch(() => null);
-    setSettings(s ? s.settings : null);
+    if (s) {
+      setUser(s.user);
+      setSettings(s.settings);
+    }
     setStatus("ready");
   };
 
