@@ -48,7 +48,6 @@ SPA deep-link รองรับแล้ว (มี `dist/404.html` ให้ G
 2. ในโฟลเดอร์ `gas/`: `clasp push -f` แล้ว `clasp deploy -d "..."` (สร้าง version ใหม่)
 3. เปิด console ของ backend รัน `setupTriggers()` หนึ่งครั้ง เพื่อตั้ง SLA trigger รายชั่วโมง
 4. copy URL ที่ลงท้าย `/exec` ไปใส่ในหน้าตั้งค่าแอป (หน้าแรกของเว็บ)
-5. พิมพ์ GAS Script ID (`1VVuO53LPkJZoVH0vwieVYujnIWDv9Usj2GsVNp2wgT1FwDDNv3vUqJx4`) ลงในช่อง Script ID ด้วย
 
 > ครั้งแรกที่เข้าใช้งาน จะสร้าง sheet: Tickets, Messages, Assets, PM, Settings, Sessions, Notifications ให้อัตโนมัติ
 > ผู้ใช้คนแรกเมื่อยังไม่มี admin จะกลายเป็น admin คนแรก
