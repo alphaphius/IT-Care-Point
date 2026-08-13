@@ -17,6 +17,7 @@ function makeSandbox() {
     if (!sheetData.has(name)) sheetData.set(name, { header: [], rows: [] });
     const d = sheetData.get(name);
     return {
+      getName: () => name,
       getLastRow: () => (d.header.length ? 1 : 0) + d.rows.length,
       getLastColumn: () =>
         Math.max(d.header.length, ...d.rows.map((r) => r.length), 0),
@@ -56,6 +57,15 @@ function makeSandbox() {
     getId: () => "SPREADSHEET_ID_1",
     getSheetByName: (n) => (sheetData.has(n) ? makeSheet(n) : null),
     insertSheet: (n) => makeSheet(n),
+    deleteSheet: (sh) => {
+      const n = sh.getName();
+      if (sheetData.has(n)) {
+        sheetData.delete(n);
+        return true;
+      }
+      return false;
+    },
+    getSheets: () => Array.from(sheetData.keys()).map(makeSheet),
   };
 
   const sandbox = {

@@ -25,6 +25,10 @@ var SESSION_TTL_MS = 14 * 24 * 60 * 60 * 1000; // 14 days
 function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) || "";
   if (action === "login") return handleLogin(e.parameter);
+  if (action === "ensure") {
+    initSheets(getSpreadsheet());
+    return json({ ok: true, data: { sheets: Object.keys(SHEET_DEFS) } });
+  }
   return json({ ok: true, data: { hello: "IT Care Point" } });
 }
 
@@ -596,26 +600,34 @@ function getSpreadsheet() {
   return ss;
 }
 
+var SHEET_DEFS = {
+  "Tickets": ["id","subject","category","urgency","description","reporter_email","reporter_name","status","assignee_email","assignee_name","sla_hours","sla_deadline","escalated","opened_at","assigned_at","resolved_at","closed_at","rating","feedback","asset_tag","attachment_name","attachment_kind","attachment_url"],
+  "Messages": ["id","ticket_id","author_email","author_name","author_role","body","kind","attachment_name","attachment_kind","attachment_url","ts"],
+  "Assets": ["tag","name","category","owner","location","notes","created_at"],
+  "PM": ["id","title","scope","cadence_days","last_run","next_due"],
+  "Settings": ["key","value"],
+  "Sessions": ["token","email","name","created_at","expires_at"],
+  "Notifications": ["id","email","ticket_id","body","ts","read"]
+};
+
 function initSheets(ss) {
-  var defs = {
-    "Tickets": ["id","subject","category","urgency","description","reporter_email","reporter_name","status","assignee_email","assignee_name","sla_hours","sla_deadline","escalated","opened_at","assigned_at","resolved_at","closed_at","rating","feedback","asset_tag","attachment_name","attachment_kind","attachment_url"],
-    "Messages": ["id","ticket_id","author_email","author_name","author_role","body","kind","attachment_name","attachment_kind","attachment_url","ts"],
-    "Assets": ["tag","name","category","owner","location","notes","created_at"],
-    "PM": ["id","title","scope","cadence_days","last_run","next_due"],
-    "Settings": ["key","value"],
-    "Sessions": ["token","email","name","created_at","expires_at"],
-    "Notifications": ["id","email","ticket_id","body","ts","read"]
-  };
-  Object.keys(defs).forEach(function (name) {
+  Object.keys(SHEET_DEFS).forEach(function (name) {
     var sh = ss.getSheetByName(name);
     if (!sh) sh = ss.insertSheet(name);
-    if (sh.getLastRow() === 0) {
-      sh.appendRow(defs[name]);
-      sh.getRange(1, 1, 1, defs[name].length).setFontWeight("bold");
-    }
-    sh.setFrozenRows(1);
+    ensureHeaders(sh, name);
+  });
+  ss.getSheets().forEach(function (sh) {
+    if (!SHEET_DEFS[sh.getName()]) ss.deleteSheet(sh);
   });
   ensureSetting("seq_tickets", "0");
+}
+
+function ensureHeaders(sh, name) {
+  if (sh.getLastRow() === 0) {
+    sh.appendRow(SHEET_DEFS[name]);
+    sh.getRange(1, 1, 1, SHEET_DEFS[name].length).setFontWeight("bold");
+  }
+  sh.setFrozenRows(1);
 }
 
 function ensureSetting(key, value) {
@@ -628,6 +640,7 @@ function getSheet(name) {
   var ss = getSpreadsheet();
   var sh = ss.getSheetByName(name);
   if (!sh) { initSheets(ss); sh = ss.getSheetByName(name); }
+  ensureHeaders(sh, name);
   return sh;
 }
 
