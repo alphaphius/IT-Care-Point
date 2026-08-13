@@ -63,7 +63,6 @@ function route(action, body, user) {
     case "notifications.read": markNotificationsRead(body.ids || []); return { ok: true };
     case "assets.list": return { assets: listAssets() };
     case "assets.create": requireAdmin(user); return { asset: createAsset(body, user) };
-    case "assets.get": return getAsset(body.tag);
     case "dashboard": requireAdmin(user); return dashboard();
     case "pm.list": requireAdmin(user); return { items: listPM() };
     case "pm.create": requireAdmin(user); return { item: createPM(body, user) };
@@ -428,15 +427,7 @@ function createAsset(body, user) {
   return rowToAsset(rec);
 }
 
-function getAsset(tag) {
-  var rows = getRows("Assets");
-  var key = String(tag || "").trim().toUpperCase();
-  for (var i = 0; i < rows.length; i++) if (rows[i].tag === key) return { asset: rowToAsset(rows[i]) };
-  return { asset: null };
-}
-
 /* ============ PM ============ */
-
 function listPM() {
   return getRows("PM").map(rowToPM);
 }

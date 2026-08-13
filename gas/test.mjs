@@ -323,8 +323,6 @@ function run() {
   assert.equal(asset.tag, "ITCP-001");
   const dup = postErr(s, "assets.create", { token: codeA, tag: "itcp-001", name: "ซ้ำ" });
   assert.match(dup.error, /มีรหัสครุภัณฑ์/);
-  assert.equal(post(s, "assets.get", { token: codeA, tag: "itcp-001" }).asset.tag, "ITCP-001");
-  assert.equal(post(s, "assets.get", { token: codeA, tag: "nope" }).asset, null);
 
   // ---- PM ----
   const pm = post(s, "pm.create", { token: codeA, title: "PM เซิร์ฟเวอร์", scope: "ทำความสะอาด", cadence_days: 30 }).item;

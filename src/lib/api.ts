@@ -133,8 +133,6 @@ export const api = {
   assetCreate: (a: Omit<Asset, "created_at">) =>
     call<{ asset: Asset }>("assets.create", a),
 
-  assetGet: (tag: string) => call<{ asset: Asset | null }>("assets.get", { tag }),
-
   dashboard: () => call<DashboardStats>("dashboard"),
 
   pmList: () => call<{ items: PMTask[] }>("pm.list"),

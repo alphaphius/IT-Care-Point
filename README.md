@@ -26,6 +26,7 @@ npm install --cache /tmp/npm-cache-itcp   # ถ้า ~/.npm มีปัญห�
 npm run dev                                # dev server
 npm run build                              # build ไปที่ dist/
 npm run preview                            # ทดสอบ build
+npm run test:gas                           # ทดสอบ logic ของ backend (mock จำลอง GAS)
 ```
 
 ## Deploy ขึ้น GitHub Pages
