@@ -255,7 +255,9 @@ function setSetting(key, value) {
 
 function bootstrapAdmin(email, name) {
   var s = getSettings();
-  if (s.admin_emails.length === 0 && s.staff_emails.length === 0) {
+  var validAdmins = s.admin_emails.filter(function (e) { return findUser(e); });
+  var validStaff = s.staff_emails.filter(function (e) { return findUser(e); });
+  if (validAdmins.length === 0 && validStaff.length === 0) {
     setSettings({ staff_emails: [], admin_emails: [email], sla_hours: s.sla_hours });
     notify(email, "", "ยินดีต้อนรับ! คุณเป็นผู้ดูแลระบบคนแรกของ " + name, false);
   }

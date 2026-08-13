@@ -425,6 +425,13 @@ function run() {
   const allD = post(s, "tickets.list", { token: codeD, scope: "all" }).tickets;
   assert.equal(allD.length, 2);
 
+  // ---- self-heal: removing last admin & staff -> next register becomes admin ----
+  assert.ok(post(s, "users.remove", { token: codeA, email: B }).removed);
+  assert.ok(post(s, "users.remove", { token: codeA, email: A }).removed);
+  const regG = register(s, "g@itcp.test", "Gus Admin", "salt-gggggg", "hash-gggggg");
+  assert.equal(regG.user.role, "admin");
+  assert.deepEqual(regG.settings.admin_emails, ["g@itcp.test"]);
+
   const dump = s.__dump();
   assert.deepEqual(dump.fileShare, ["ANYONE_WITH_LINK", "EDIT"]);
   assert.deepEqual(dump.folderShare, ["ANYONE_WITH_LINK", "EDIT"]);
