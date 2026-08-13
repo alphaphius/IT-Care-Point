@@ -72,16 +72,21 @@ async function call<T>(
   return data.data as T;
 }
 
-export function loginUrl(redirect: string) {
-  const cfg = loadConfig();
-  if (!cfg.scriptUrl) throw new ApiError("ยังไม่ได้ตั้งค่า URL ของ Apps Script", "no-config");
-  const sep = cfg.scriptUrl.includes("?") ? "&" : "?";
-  return `${cfg.scriptUrl.replace(/\/+$/, "")}${sep}action=login&redirect=${encodeURIComponent(redirect)}`;
+export interface AuthResult {
+  token: string;
+  user: UserProfile;
+  settings: AppSettings;
 }
 
 export const api = {
-  verify: (code: string) =>
-    call<{ token: string; user: UserProfile }>("verify", { code }),
+  authSalt: (email: string) =>
+    call<{ salt: string; iterations: number }>("auth.salt", { email }),
+
+  authRegister: (email: string, name: string, salt: string, hash: string) =>
+    call<AuthResult>("auth.register", { email, name, salt, hash }),
+
+  authLogin: (email: string, hash: string) =>
+    call<AuthResult>("auth.login", { email, hash }),
 
   session: () => call<{ user: UserProfile; settings: AppSettings }>("session"),
 

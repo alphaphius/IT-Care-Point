@@ -205,31 +205,47 @@ function postErr(s, action, body) {
   return JSON.parse(res.content);
 }
 
-function login(s, redirect) {
-  const out = s.doGet({ parameter: { action: "login", redirect } });
-  const m = /code=([^"]+)/.exec(out.html);
-  assert.ok(m, "login redirect must carry code, got: " + out.html);
-  return m[1];
+function register(s, email, name, salt, hash) {
+  return post(s, "auth.register", { email, name, salt, hash });
+}
+
+function loginPw(s, email, hash) {
+  return post(s, "auth.login", { email, hash });
 }
 
 function run() {
   const s = load(makeSandbox());
-  const HOST = "https://itcp.example.com/IT-Care-Point/";
   const A = "a@itcp.test", B = "b@itcp.test", C = "c@itcp.test";
 
   // ---- doGet defaults ----
   const hello = JSON.parse(s.doGet({}).content);
   assert.equal(hello.ok, true);
 
-  // ---- login ----
-  const codeA = login(s, HOST + "#/login");
-  const verifyA = post(s, "verify", { code: codeA });
-  assert.equal(verifyA.user.email, A);
+  // ---- register first user -> admin (bootstrap) ----
+  const regA = register(s, A, "Alice Admin", "salt-aaaaaa", "hash-aaaaaa");
+  assert.equal(regA.user.email, A);
+  assert.equal(regA.user.role, "admin");
+  assert.deepEqual(regA.settings.admin_emails, [A]);
+  const codeA = regA.token;
 
-  // ---- session -> bootstrap admin ----
+  // ---- auth.salt returns stored salt + iterations ----
+  assert.equal(post(s, "auth.salt", { email: A }).salt, "salt-aaaaaa");
+  assert.equal(post(s, "auth.salt", { email: A }).iterations, 100000);
+
+  // ---- login rejects wrong hash / unknown email ----
+  assert.equal(postErr(s, "auth.login", { email: A, hash: "hash-wronggg" }).code, "auth");
+  assert.equal(postErr(s, "auth.login", { email: "nobody@x.test", hash: "hash-aaaaaa" }).code, "auth");
+
+  // ---- register validation ----
+  assert.match(postErr(s, "auth.register", { email: A, name: "dup", salt: "salt-aaaaaa", hash: "hash-aaaaaa" }).error, /มีผู้ใช้/);
+  assert.match(postErr(s, "auth.register", { email: "not-an-email", name: "x", salt: "salt-xxxxxx", hash: "hash-xxxxxx" }).error, /อีเมล/);
+
+  // ---- correct login mints same token for fresh session ----
+  assert.ok(loginPw(s, A, "hash-aaaaaa").token);
+
+  // ---- session -> admin ----
   const sessA = post(s, "session", { token: codeA });
   assert.equal(sessA.user.role, "admin");
-  assert.deepEqual(sessA.settings.admin_emails, [A]);
 
   // ---- admin sets staff ----
   post(s, "settings.update", {
@@ -238,10 +254,11 @@ function run() {
   });
   assert.equal(post(s, "session", { token: codeA }).settings.staff_emails[0], B);
 
-  // ---- user C logs in + creates ticket ----
-  s.__setUser(C);
-  const codeC = login(s, HOST + "#/login");
-  post(s, "session", { token: codeC });
+  // ---- register B (staff) + C (user) ----
+  const regB = register(s, B, "Bob Staff", "salt-bbbbbb", "hash-bbbbbb");
+  assert.equal(regB.user.role, "staff");
+  const codeB = regB.token;
+  const codeC = register(s, C, "Cara User", "salt-cccccc", "hash-cccccc").token;
   const newTicket = post(s, "tickets.create", {
     token: codeC,
     subject: "คอมพิวเตอร์เปิดไม่ติด",
@@ -268,9 +285,6 @@ function run() {
   assert.match(denied.error, /ยกเลิก/);
 
   // ---- staff B claims + progresses ----
-  s.__setUser(B);
-  const codeB = login(s, HOST + "#/login");
-  post(s, "session", { token: codeB });
   const assigned = post(s, "tickets.assign", {
     token: codeB,
     id: newTicket.id,
@@ -373,8 +387,6 @@ function run() {
   // ---- auth hardening ----
   const noToken = postErr(s, "tickets.list", {});
   assert.equal(noToken.code, "auth");
-  const badCode = postErr(s, "verify", { code: "nope" });
-  assert.equal(badCode.code, "auth");
   const badJson = s.doPost({ postData: { contents: "{oops" } });
   assert.equal(JSON.parse(badJson.content).code, "bad-json");
 
@@ -395,8 +407,7 @@ function run() {
   assert.match(closedChat.error, /ปิดแล้ว/);
 
   // ---- second login shares same DB (props path) ----
-  s.__setUser("d@itcp.test");
-  const codeD = login(s, HOST + "#/login");
+  const codeD = register(s, "d@itcp.test", "Dee User", "salt-dddddd", "hash-dddddd").token;
   const allD = post(s, "tickets.list", { token: codeD, scope: "all" }).tickets;
   assert.equal(allD.length, 2);
 

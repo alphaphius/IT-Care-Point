@@ -1,48 +1,61 @@
-import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { GoogleLogo, SlidersHorizontal } from "@phosphor-icons/react";
-import { Button } from "@/components/ui";
-import { loginUrl } from "@/lib/api";
+import { useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
+import { SlidersHorizontal } from "@phosphor-icons/react";
+import { Button, Field, Input, useToast } from "@/components/ui";
 import { ApiError } from "@/lib/api";
 import { loadConfig } from "@/lib/config";
 import { useSession } from "@/lib/session";
-import { useToast } from "@/components/ui";
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 export function LoginPage() {
-  const { login, status } = useSession();
+  const { login, register, status } = useSession();
   const nav = useNavigate();
   const toast = useToast();
-  const [params] = useSearchParams();
-  const [busy, setBusy] = useState(false);
   const cfg = loadConfig();
-
-  useEffect(() => {
-    const code = params.get("code");
-    if (!code) return;
-    setBusy(true);
-    login(code)
-      .then(() => nav("/"))
-      .catch((e) => {
-        toast("error", e instanceof ApiError ? e.message : "เข้าสู่ระบบไม่สำเร็จ");
-        setBusy(false);
-      });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const start = () => {
-    try {
-      setBusy(true);
-      window.location.href = loginUrl(`${window.location.origin}${import.meta.env.BASE_URL}login`);
-    } catch (e) {
-      setBusy(false);
-      toast("error", e instanceof ApiError ? e.message : "เกิดข้อผิดพลาด");
-    }
-  };
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
 
   if (status === "ready") {
     nav("/");
     return null;
   }
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    const em = email.trim().toLowerCase();
+    if (!EMAIL_RE.test(em)) {
+      toast("error", "รูปแบบอีเมลไม่ถูกต้อง");
+      return;
+    }
+    if (password.length < 6) {
+      toast("error", "รหัสผ่านต้องอย่างน้อย 6 ตัวอักษร");
+      return;
+    }
+    if (mode === "register") {
+      if (name.trim().length < 2) {
+        toast("error", "กรุณากรอกชื่อ");
+        return;
+      }
+      if (password !== confirm) {
+        toast("error", "ยืนยันรหัสผ่านไม่ตรงกัน");
+        return;
+      }
+    }
+    setBusy(true);
+    try {
+      if (mode === "register") await register(name.trim(), em, password);
+      else await login(em, password);
+      nav("/");
+    } catch (err) {
+      toast("error", err instanceof ApiError ? err.message : "เข้าสู่ระบบไม่สำเร็จ");
+      setBusy(false);
+    }
+  };
 
   return (
     <div className="flex min-h-[100dvh] items-center justify-center bg-neutral-50 px-4 dark:bg-zinc-950">
@@ -62,20 +75,87 @@ export function LoginPage() {
           </p>
         </div>
 
-        <div className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <Button size="lg" onClick={start} loading={busy}>
-            <GoogleLogo size={18} weight="bold" />
-            เข้าสู่ระบบด้วย Google
-          </Button>
-          {(!cfg.scriptUrl || !cfg.apiUrl) && (
-            <Button variant="outline" onClick={() => nav("/setup")}>
+        <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="mb-5 grid grid-cols-2 gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800">
+            {(
+              [
+                ["login", "เข้าสู่ระบบ"],
+                ["register", "สมัครสมาชิก"],
+              ] as const
+            ).map(([v, label]) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setMode(v)}
+                className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  mode === v
+                    ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white"
+                    : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-4">
+            {mode === "register" && (
+              <Field label="ชื่อ" required>
+                <Input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="ชื่อ-นามสกุล"
+                  autoComplete="name"
+                />
+              </Field>
+            )}
+            <Field label="อีเมล" required>
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@company.com"
+                autoComplete="email"
+              />
+            </Field>
+            <Field label="รหัสผ่าน" required>
+              <Input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={mode === "register" ? "อย่างน้อย 6 ตัวอักษร" : "รหัสผ่าน"}
+                autoComplete={mode === "register" ? "new-password" : "current-password"}
+              />
+            </Field>
+            {mode === "register" && (
+              <Field label="ยืนยันรหัสผ่าน" required>
+                <Input
+                  type="password"
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  placeholder="พิมพ์รหัสผ่านอีกครั้ง"
+                  autoComplete="new-password"
+                />
+              </Field>
+            )}
+            <Button type="submit" size="lg" loading={busy} className="mt-1">
+              {mode === "register" ? "สมัครสมาชิก" : "เข้าสู่ระบบ"}
+            </Button>
+          </form>
+
+          {!cfg.apiUrl && (
+            <Button
+              variant="outline"
+              className="mt-3 w-full"
+              onClick={() => nav("/setup")}
+            >
               <SlidersHorizontal size={16} />
               ตั้งค่าครั้งแรก
             </Button>
           )}
         </div>
         <p className="mt-4 text-center text-xs text-zinc-400">
-          ใช้บัญชี Google ขององค์กรของคุณ
+          ผู้ดูแลระบบจะเพิ่มอีเมลของคุณในระบบก่อนจึงจะสมัครได้
         </p>
       </div>
     </div>

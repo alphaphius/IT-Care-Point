@@ -50,10 +50,6 @@ export function SetupPage() {
   };
 
   const save = async () => {
-    if (!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(form.scriptUrl.trim())) {
-      setError("URL ล็อกอินต้องอยู่ในรูปแบบ https://script.google.com/macros/s/.../exec");
-      return;
-    }
     if (!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(form.apiUrl.trim())) {
       setError("URL API ต้องอยู่ในรูปแบบ https://script.google.com/macros/s/.../exec");
       return;
@@ -68,7 +64,7 @@ export function SetupPage() {
     }
     setSaving(true);
     try {
-      const cfg = { ...form, scriptUrl: form.scriptUrl.trim() };
+      const cfg = { ...form, apiUrl: form.apiUrl.trim() };
       saveConfig(cfg);
       applyConfig(cfg);
       toast("success", "บันทึกการตั้งค่าแล้ว");
@@ -94,22 +90,6 @@ export function SetupPage() {
         </div>
 
         <div className="flex flex-col gap-5 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <Field
-            label="URL ล็อกอิน (Apps Script รันเป็นผู้ใช้ ต้องลงท้ายด้วย /exec)"
-            required
-            hint="ใช้หน้าเข้าสู่ระบบ เปลี่ยนเมื่อ deploy ใหม่เท่านั้น"
-          >
-            <Input
-              value={form.scriptUrl}
-              onChange={(e) => {
-                setForm((p) => ({ ...p, scriptUrl: e.target.value }));
-                setError(null);
-              }}
-              placeholder="https://script.google.com/macros/s/.../exec"
-              inputMode="url"
-            />
-          </Field>
-
           <Field
             label="URL API (Apps Script แบบ Anonymous ต้องลงท้ายด้วย /exec)"
             required

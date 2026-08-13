@@ -4,15 +4,15 @@
  * Setup (in the Apps Script editor):
  *  1. Paste this whole file into Code.gs.
  *  2. Deploy -> New deployment -> Web app
- *     - Execute as: User accessing the web app
- *     - Who has access: Anyone with Google account
+ *     - Execute as: Me
+ *     - Who has access: Anyone, even anonymous
  *  3. Copy the /exec URL into the app's setup screen.
  *  4. Run `setupTriggers()` once (menu Run) to enable SLA escalation checks.
  *
- * Auth model: no OAuth dance needed. The deployment itself requires a Google
- * account. `doGet?action=login` reads the signed-in user via Session.getActiveUser(),
- * mints a session token (Sessions sheet), and redirects the browser back to the
- * frontend with ?code=TOKEN. The frontend then sends that token in the request
+ * Auth model: username/email + password, hashed client-side with PBKDF2-SHA256
+ * (salt is random per user, stored in the Users sheet). The frontend never sends
+ * the raw password to the server - only the derived hash. `auth.login` mints a
+ * session token (Sessions sheet); the frontend sends that token in the request
  * body for every API call - robust across browsers and CORS.
  */
 
@@ -24,7 +24,6 @@ var SESSION_TTL_MS = 14 * 24 * 60 * 60 * 1000; // 14 days
 
 function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) || "";
-  if (action === "login") return handleLogin(e.parameter);
   if (action === "ensure") {
     initSheets(getSpreadsheet());
     return json({ ok: true, data: { sheets: Object.keys(SHEET_DEFS) } });
@@ -41,7 +40,9 @@ function doPost(e) {
   }
   var action = body.action || "";
   try {
-    if (action === "verify") return json({ ok: true, data: verify(body) });
+    if (action === "auth.salt") return json({ ok: true, data: authSalt(body) });
+    if (action === "auth.register") return json({ ok: true, data: authRegister(body) });
+    if (action === "auth.login") return json({ ok: true, data: authLogin(body) });
     var session = requireSession(body);
     var user = { email: session.email, name: session.name, role: roleOf(session.email) };
     return json({ ok: true, data: route(action, body, user) });
@@ -75,26 +76,62 @@ function route(action, body, user) {
   }
 }
 
-/* ============ Auth ============ */
+/* ============ Auth (email + password, PBKDF2-SHA256) ============ */
 
-function handleLogin(params) {
-  var redirect = params.redirect;
-  if (!redirect || redirect.indexOf("http") !== 0) redirect = "";
-  var user = Session.getActiveUser();
-  var email = user ? user.getEmail() : "";
-  if (!email) {
-    var html = '<html><body style="font-family:sans-serif;text-align:center;padding:40px">'
-      + '<h2>กรุณาเข้าสู่ระบบ Google ก่อน</h2>'
-      + '<a href="https://accounts.google.com/" style="font-size:18px">เข้าสู่ระบบ Google</a></body></html>';
-    return HtmlService.createHtmlOutput(html);
-  }
-  var name = displayName(email);
+var PBKDF2_ITERATIONS = 100000;
+
+function authSalt(body) {
+  var email = String(body.email || "").toLowerCase().trim();
+  var user = findUser(email);
+  if (!user) throw authError("ไม่พบผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
+  return { salt: user.salt, iterations: PBKDF2_ITERATIONS };
+}
+
+function authRegister(body) {
+  var email = String(body.email || "").toLowerCase().trim();
+  var name = String(body.name || "").trim().slice(0, 100);
+  var salt = String(body.salt || "");
+  var hash = String(body.hash || "");
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("รูปแบบอีเมลไม่ถูกต้อง");
+  if (name.length < 2) throw new Error("กรุณากรอกชื่อ");
+  if (salt.length < 8 || hash.length < 8) throw new Error("ข้อมูลการเข้ารหัสไม่ถูกต้อง");
+  if (findUser(email)) throw new Error("มีผู้ใช้ในระบบนี้แล้ว");
+  appendRow("Users", {
+    email: email, name: name, salt: salt, hash: hash,
+    created_at: new Date().toISOString()
+  });
+  bootstrapAdmin(email, name);
+  return issueSession(email, name);
+}
+
+function authLogin(body) {
+  var email = String(body.email || "").toLowerCase().trim();
+  var user = findUser(email);
+  if (!user) throw authError("ไม่พบผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
+  if (!safeEqual(user.hash, String(body.hash || ""))) throw authError("ไม่พบผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
+  return issueSession(user.email, user.name);
+}
+
+function issueSession(email, name) {
+  var user = { email: email, name: name, role: roleOf(email) };
+  if (user.role === "user") bootstrapAdmin(email, name);
+  user.role = roleOf(email);
   var token = createSession(email, name);
-  var sep = redirect.indexOf("?") >= 0 ? "&" : "?";
-  var target = redirect + sep + "code=" + encodeURIComponent(token);
-  return HtmlService.createHtmlOutput(
-    '<script>window.location.replace(' + JSON.stringify(target) + ');</script>'
-  );
+  return { token: token, user: user, settings: getSettings() };
+}
+
+function findUser(email) {
+  var rows = getRows("Users");
+  for (var i = 0; i < rows.length; i++) if (rows[i].email === email) return rows[i];
+  return null;
+}
+
+function safeEqual(a, b) {
+  a = String(a); b = String(b);
+  if (a.length !== b.length) return false;
+  var d = 0;
+  for (var i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
 }
 
 function requireSession(body) {
@@ -119,17 +156,6 @@ function createSession(email, name) {
     expires_at: new Date(now.getTime() + SESSION_TTL_MS).toISOString()
   });
   return token;
-}
-
-function verify(body) {
-  var rows = getRows("Sessions");
-  for (var i = 0; i < rows.length; i++) {
-    if (rows[i].token === body.code) {
-      if (new Date(rows[i].expires_at) < new Date()) throw authError("เซสชันหมดอายุ");
-      return { token: body.code, user: { email: rows[i].email, name: rows[i].name, role: roleOf(rows[i].email) } };
-    }
-  }
-  throw authError("ลิงก์เข้าสู่ระบบไม่ถูกต้อง กรุณากดปุ่มเข้าสู่ระบบอีกครั้ง");
 }
 
 function authError(msg) {
@@ -607,6 +633,7 @@ var SHEET_DEFS = {
   "PM": ["id","title","scope","cadence_days","last_run","next_due"],
   "Settings": ["key","value"],
   "Sessions": ["token","email","name","created_at","expires_at"],
+  "Users": ["email","name","salt","hash","created_at"],
   "Notifications": ["id","email","ticket_id","body","ts","read"]
 };
 

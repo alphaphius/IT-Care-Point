@@ -8,6 +8,7 @@ import {
 import { Navigate, useLocation } from "react-router-dom";
 import { api, setToken, getToken } from "./api";
 import { applyConfig, loadConfig } from "./config";
+import { generateSalt, hashPassword } from "./auth";
 import type { AppSettings, Role, UserProfile } from "./types";
 
 type Status = "booting" | "no-config" | "anon" | "ready";
@@ -16,7 +17,8 @@ interface SessionState {
   status: Status;
   user: UserProfile | null;
   settings: AppSettings | null;
-  login: (code: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   refresh: () => Promise<void>;
 }
@@ -26,6 +28,7 @@ const Ctx = createContext<SessionState>({
   user: null,
   settings: null,
   login: async () => {},
+  register: async () => {},
   logout: () => {},
   refresh: async () => {},
 });
@@ -65,15 +68,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const login = async (code: string) => {
-    const res = await api.verify(code);
+  const login = async (email: string, password: string) => {
+    const { salt, iterations } = await api.authSalt(email);
+    const hash = await hashPassword(password, salt, iterations);
+    const res = await api.authLogin(email, hash);
     setToken(res.token);
     setUser(res.user);
-    const s = await api.session().catch(() => null);
-    if (s) {
-      setUser(s.user);
-      setSettings(s.settings);
-    }
+    setSettings(res.settings);
+    setStatus("ready");
+  };
+
+  const register = async (name: string, email: string, password: string) => {
+    const salt = await generateSalt();
+    const hash = await hashPassword(password, salt);
+    const res = await api.authRegister(email, name, salt, hash);
+    setToken(res.token);
+    setUser(res.user);
+    setSettings(res.settings);
     setStatus("ready");
   };
 
@@ -85,7 +96,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Ctx.Provider value={{ status, user, settings, login, logout, refresh }}>
+    <Ctx.Provider value={{ status, user, settings, login, register, logout, refresh }}>
       {children}
     </Ctx.Provider>
   );
