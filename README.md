@@ -40,7 +40,7 @@ SPA deep-link รองรับแล้ว (มี `dist/404.html` ให้ G
 ## ติดตั้ง Backend (Google Apps Script)
 **สถานะ: deploy แล้วแล้ว** ที่ Script ID `1VVuO53LPkJZoVH0vwieVYujnIWDv9Usj2GsVNp2wgT1FwDDNv3vUqJx4`
 
-- Web app URL (ใช้ลงในหน้า Setup): `https://script.google.com/macros/s/AKfycbzr7hMGqsD9VvHpKmgD7LmsuxNbq75vaRttsbfLvjp17AoWuDS7gjpldo5WZpkHxpiTkQ/exec`
+- Web app URL (ใช้ลงในหน้า Setup): `https://script.google.com/macros/s/AKfycbzixqTu8NwASw3hl6f_4iKW0EIDpz7KUvenyHE4nXjeItqXGaJkSDtbmjbEjLmC1DX1Pg/exec`
 - Execute as: **User accessing the web app** / Access: **Anyone with Google account**
 
 ถ้าจะ deploy ใหม่ด้วยตัวเอง:
