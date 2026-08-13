@@ -155,7 +155,7 @@ export function LoginPage() {
           )}
         </div>
         <p className="mt-4 text-center text-xs text-zinc-400">
-          ผู้ดูแลระบบจะเพิ่มอีเมลของคุณในระบบก่อนจึงจะสมัครได้
+          ผู้ที่สมัครสมาชิกเป็นคนแรกของระบบจะได้สิทธิ์ผู้ดูแลระบบ
         </p>
       </div>
     </div>
